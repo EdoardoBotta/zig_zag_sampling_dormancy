@@ -3,6 +3,7 @@
 #include <tuple>
 #include <cmath>
 #include <random>
+#include "tree.hpp"
 using namespace std;
 
 int BinomialCoefficient(const int n, const int k) {
@@ -21,107 +22,6 @@ int sample_branch(Tree tree){
     sample branch from tree.v
     return index of the branch
 } */
-
-class Lineage{
-    public:
-    bool active;
-    int n_mutations;
-    std::vector<int> time_accesses;
-    Lineage* left_child;
-    Lineage* right_child;
-    Lineage* parent;
-
-    public:
-    bool isActive(){
-        return this->active;
-    }
-};
-
-class Tree{
-    public:
-    std::vector<Lineage> v;
-    std::vector<double> times;
-
-    public:
-    Lineage GetBranch(int ind){
-        return this->v[ind];
-    }
-
-    public:
-    int CountTimeIntervals(){
-        return this->times.size();
-    }
-
-    public:
-    double GetTime(int ind){
-        return this->times[ind];
-    }
-
-    public:
-    int CountDormancyPeriods(){
-        int count_dormancy_periods = 0;
-        
-        for (int i=0; i < this->v.size(); i++){
-            if (!v[i].active){
-                count_dormancy_periods++;
-            };    
-        };
-        return count_dormancy_periods;
-    }
-    
-    public:
-    float GetBranchLength(int ind){
-        double length = 0;
-        std::vector<int> time_contribs = v[ind].time_accesses;
-        for(int i=0; i < time_contribs.size(); i++){
-            length += this->times[time_contribs[i]];
-        }
-        return length;
-    }
-
-    public:
-    std::tuple<int,int> CountLineagesUsing(int ind){
-        int nAwake = 0;
-        int nDormient = 0;
-        int m = 0;
-
-        for (int j=0; j < this->v.size(); j++){
-            for (int k=0; k < this->v[j].time_accesses.size(); k++){
-                if (this->v[j].time_accesses[k] == ind){
-                    if (this->v[j].active){
-                        nAwake++;
-                    }
-                    else nDormient++;
-                }
-            }
-        }
-        return {nAwake, nDormient};
-    }
-
-
-    public:
-    float ComputeLikelihood(int c, int K){
-        int n_awake, n_dormient, m;
-        double sum_exp = 0;
-        for (int i=0; i < this->CountTimeIntervals(); i++){
-            n_awake = 0;
-            n_dormient = 0;
-            for (int j=0; j < this->v.size(); j++){
-                m = 0;
-                for (int k=0; k < this->v[j].time_accesses.size(); k++){
-                    if (this->v[j].time_accesses[k] == i){
-                        if (this->v[j].active){
-                            n_awake++;
-                        }
-                        else n_dormient++;
-                    }
-                }
-            }
-            sum_exp += (BinomialCoefficient(n_awake, 2) + c*n_awake + c*K*n_dormient)*this->GetTime(i);
-        }
-        return exp(-sum_exp)*pow(c, 2*this->CountDormancyPeriods())*pow(K, this->CountDormancyPeriods());
-    }
-};
 
 class SimState{
     public:
@@ -200,42 +100,42 @@ class SimState{
     }
 
     double ComputeLambdaC(float theta1, float theta2, float c, float K){
-        Tree cur_tree = this->tree;
+        Tree curTree = this->tree;
         float brackets = 0;
         double prod;
         int nDormancyPeriods;
 
-        for(int i=0; i<cur_tree.CountTimeIntervals(); i++){
-            auto [nAwake, nDormient] = cur_tree.CountLineagesUsing(i);
-            brackets += (nAwake + K*nDormient)*cur_tree.GetTime(i);
+        for(int i=0; i<curTree.CountTimeIntervals(); i++){
+            auto [nAwake, nDormient] = curTree.CountLineagesUsing(i);
+            brackets += (nAwake + K*nDormient)*curTree.GetTime(i);
         }
-        nDormancyPeriods = cur_tree.CountDormancyPeriods();
+        nDormancyPeriods = curTree.CountDormancyPeriods();
         prod = this->c_velocity*(brackets - 2*nDormancyPeriods/c);
 
         return std::max(prod, 0.0);
     }
 
     double ComputeLambdaK(float c, float K){
-        Tree cur_tree = this->tree;
-        float weighted_sum = 0;
+        Tree curTree = this->tree;
+        float weightedSum = 0;
         double prod;
         int nDormancyPeriods;
 
-        for(int i=0; i<cur_tree.CountTimeIntervals(); i++){
-            auto [nAwake, nDormient] = cur_tree.CountLineagesUsing(i);
+        for(int i=0; i<curTree.CountTimeIntervals(); i++){
+            auto [nAwake, nDormient] = curTree.CountLineagesUsing(i);
             cout << nDormient << "\n";
-            weighted_sum += nDormient*cur_tree.GetTime(i);
+            weightedSum += nDormient*curTree.GetTime(i);
         }
-        nDormancyPeriods = cur_tree.CountDormancyPeriods();
-        cout << weighted_sum;
-        prod = this->K_velocity*(c*weighted_sum - nDormancyPeriods/K);
+        nDormancyPeriods = curTree.CountDormancyPeriods();
+        cout << weightedSum;
+        prod = this->K_velocity*(c*weightedSum - nDormancyPeriods/K);
 
         return std::max(prod, 0.0);
     }
 
     double ComputeLambdaTheta(float theta, int ind){
         // ind is expected to be 1 for theta_1 and 2 for theta_2
-        Tree cur_tree = this->tree;
+        Tree curTree = this->tree;
         Lineage lineage;
         double velocity, linLength, sigma;
         bool linFilter;
@@ -245,8 +145,8 @@ class SimState{
         }
         else velocity = this->theta1_velocity;
 
-        for(int i=0; i<cur_tree.v.size(); i++){
-            lineage = cur_tree.v[i];
+        for(int i=0; i<curTree.CountBranches(); i++){
+            lineage = curTree.v[i];
             
             switch(ind){
                 
@@ -260,7 +160,7 @@ class SimState{
             }
             
             if (linFilter) {
-                linLength = cur_tree.GetBranchLength(i);
+                linLength = curTree.GetBranchLength(i);
                 sigma += (linLength/2 - lineage.n_mutations/theta);
             }   
         }
@@ -283,7 +183,7 @@ class SimState{
         float velocity = this->time_velocities[ind];
 
         // TODO: Should only consider brenaches using time interval i
-        for(int i=0; i<curTree.v.size(); i++){
+        for(int i=0; i<curTree.CountBranches(); i++){
             
             lineage = curTree.v[i];
             linLength = curTree.GetBranchLength(i); 
@@ -348,35 +248,35 @@ class ZigZagSimulation{
         }
     }
 
-    double SimulateNextFlip(const int ind, const double t_max){
-        SimState cur_state = this->state;
+    double SimulateNextFlip(const int ind, const double tMax){
+        SimState curState = this->state;
         double rho = 0, alpha;
-        double velocity, lambda_upper;
+        double velocity, lambdaUpper;
 
-        n_time_intervals = cur_state.tree.CountTimeIntervals();
+        nTimeIntervals = curState.tree.CountTimeIntervals();
 
         // identify parameter
         // TODO: implement compute_x_upper() methods
         switch(ind){
-            case n_time_intervals:
+            case nTimeIntervals:
                 velocity = state.c_velocity;
                 lambda_upper = state.compute_lambda_c_upper();
                 break;
-            case n_time_intervals + 1:
+            case nTimeIntervals + 1:
                 velocity = state.K_velocity;
                 lambda_upper = state.compute_lambda_K_upper();
                 break;
-            case n_time_intervals + 2:
+            case nTimeIntervals + 2:
                 velocity = state.theta_1_velocity;
                 lambda_upper = state.compute_lambda_theta_1_upper();
                 break;
-            case n_time_intervals + 3:
+            case nTimeIntervals + 3:
                 velocity = state.theta_2_velocity;
                 lambda_upper = state.compute_lambda_theta_2_upper();
                 break;
             default:
                 velocity = state.time_velocities[ind];
-                lambda_upper = state.compute_lambda_i_upper(ind);  
+                lambdaUpper = state.compute_lambda_i_upper(ind);  
         }
 
         std::default_random_engine generator;
@@ -387,7 +287,7 @@ class ZigZagSimulation{
 
         while(true){
             rho += distribution(generator);
-            if(rho < t_max){
+            if(rho < tMax){
                 alpha = ; // TODO: set new alpha
             } else alpha = 1;
 
