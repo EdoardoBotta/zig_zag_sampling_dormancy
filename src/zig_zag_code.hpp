@@ -6,17 +6,6 @@
 #include "tree.hpp"
 using namespace std;
 
-int BinomialCoefficient(const int n, const int k) {
-  std::vector<int> aSolutions(k);
-  aSolutions[0] = n - k + 1;
-
-  for (int i = 1; i < k; ++i) {
-    aSolutions[i] = aSolutions[i - 1] * (n - k + 1 + i) / (i + 1);
-  }
-
-  return aSolutions[k - 1];
-}
-
 /*
 int sample_branch(Tree tree){
     sample branch from tree.v
@@ -43,59 +32,65 @@ class SimState{
     }
     
     public:
-    double FlipVelocity(int ind){
-        int nTimeIntervals = this->tree.CountTimeIntervals();
+    void FlipVelocity(const int ind){
+        const int nTimeIntervals = this->tree.CountTimeIntervals();
         
-        switch(ind){
-            case nTimeIntervals:
-                this->c_velocity *= -1;
-                break;
-            case nTimeIntervals + 1:
-                this->K_velocity *= -1;
-                break;
-            case nTimeIntervals + 2:
-                this->theta1_velocity *= -1;
-                break;
-            case nTimeIntervals + 3:
-                this->theta2_velocity *= -1;
-                break;
-            default:
-                this->time_velocities[ind] *= -1;
-                break;
+        if(ind == nTimeIntervals){
+            this->c_velocity *= -1;
+        }
+        else if(ind == nTimeIntervals + 1){
+            this->K_velocity *= -1;
+        }
+        else if(ind == nTimeIntervals + 2){
+            this->theta1_velocity *= -1;
+        }
+        else if(nTimeIntervals + 3){
+            this->theta2_velocity *= -1;
+        }
+        else {
+            this->time_velocities[ind] *= -1;
         }
     }
 
     public:
-    double GetVelocity(int ind){
-        int nTimeIntervals = this->tree.CountTimeIntervals();
-        switch(ind){
-            case nTimeIntervals:
-                return this->c_velocity;
-            case nTimeIntervals + 1:
-                return this->K_velocity;
-            case nTimeIntervals + 2:
-                return this->theta1_velocity;
-            case nTimeIntervals + 3:
-                return this->theta2_velocity;
-            default:
-                return this->time_velocities[ind];
+    double GetVelocity(const int ind){
+        const int nTimeIntervals = this->tree.CountTimeIntervals();
+        if(ind == nTimeIntervals){
+            return this->c_velocity *= -1;
+        }
+        else if(ind == nTimeIntervals + 1){
+            return this->K_velocity *= -1;
+        }
+        else if(ind == nTimeIntervals + 2){
+            return this->theta1_velocity *= -1;
+        }
+        else if(nTimeIntervals + 3){
+            return this->theta2_velocity *= -1;
+        }
+        else {
+            return this->time_velocities[ind] *= -1;
         }
     }
+    
 
-    double ComputeLambda(float theta1, float theta2, float c, float K, int ind){
-        int nTimeIntervals = this->tree.CountTimeIntervals();
+    double ComputeLambda(const float theta1, const float theta2, const float c, 
+                         const float K, const int ind){
+        const int nTimeIntervals = this->tree.CountTimeIntervals();
 
-        switch(ind){
-            case nTimeIntervals:
-                return this->ComputeLambdaC(theta1, theta2, c, K);
-            case nTimeIntervals + 1:
-                return this->ComputeLambdaK(c,K);
-            case nTimeIntervals + 2:
-                return this->ComputeLambdaTheta(theta1, 1);
-            case nTimeIntervals + 3:
-                return this->ComputeLambdaTheta(theta2, 2);
-            default:
-                return this->ComputeLambdaI(theta1, theta2, c, K, ind);
+        if(ind == nTimeIntervals){
+            return this->ComputeLambdaC(theta1, theta2, c, K);
+        }
+        else if(ind == nTimeIntervals + 1){
+            return this->ComputeLambdaK(c,K);
+        }
+        else if(ind == nTimeIntervals + 2){
+            return this->ComputeLambdaTheta(theta1, 1);
+        }
+        else if(nTimeIntervals + 3){
+            return this->ComputeLambdaTheta(theta2, 2);
+        }
+        else {
+            return this->ComputeLambdaI(theta1, theta2, c, K, ind);
         }
     }
 
@@ -133,7 +128,7 @@ class SimState{
         return std::max(prod, 0.0);
     }
 
-    double ComputeLambdaTheta(float theta, int ind){
+    double ComputeLambdaTheta(const float theta, const int ind){
         // ind is expected to be 1 for theta_1 and 2 for theta_2
         Tree curTree = this->tree;
         Lineage lineage;
@@ -145,24 +140,23 @@ class SimState{
         }
         else velocity = this->theta1_velocity;
 
-        for(int i=0; i<curTree.CountBranches(); i++){
-            lineage = curTree.v[i];
+        for(Lineage branch : curTree){
             
             switch(ind){
                 
                 case 1: 
-                linFilter = lineage.isActive();
+                linFilter = branch.isActive();
                 break;
                 
                 case 0:
-                linFilter = !lineage.isActive();
+                linFilter = !branch.isActive();
                 break;
             }
             
             if (linFilter) {
-                linLength = curTree.GetBranchLength(i);
+                linLength = curTree.GetBranchLength(branch);
                 sigma += (linLength/2 - lineage.n_mutations/theta);
-            }   
+            }
         }
         return std::max(velocity*sigma, 0.0);
     }
@@ -182,82 +176,81 @@ class SimState{
         auto [nAwake, nDormient] = curTree.CountLineagesUsing(ind);
         float velocity = this->time_velocities[ind];
 
-        // TODO: Should only consider brenaches using time interval i
-        for(int i=0; i<curTree.CountBranches(); i++){
+        for(Lineage branch : curTree){
             
-            lineage = curTree.v[i];
-            linLength = curTree.GetBranchLength(i); 
+            if(branch.isUsingTime(ind)){
+                linLength = curTree.GetBranchLength(branch); 
 
-            if (lineage.isActive()){
-                theta = theta1;
-            } else theta = theta2;
+                if (branch.isActive()){
+                    theta = theta1;
+                } else theta = theta2;
             
-            sigma += (linNumMutations/linLength - theta/2);            
+                sigma += (linNumMutations/linLength - theta/2); 
+            }           
         }
 
         prod = velocity*(-sigma + BinomialCoefficient(nAwake, 2) + c*nAwake + c*K*nDormient);
 
         return std::max(prod, 0.0);
     }
-
-
-
 };
 
 class ZigZagSimulation{
     SimState state;
     int theta1, theta2, c, K;
 
-    double SetParameter(int ind, double value){
-        int nTimeIntervals = this->tree.CountTimeIntervals();
+    void SetParameter(int ind, double value){
+        const int nTimeIntervals = this->state.tree.CountTimeIntervals();
         
-        switch(ind){
-            case nTimeIntervals:
-                this->c = value;
-                break;
-            case nTimeIntervals + 1:
-                this->K = value;
-                break;
-            case nTimeIntervals + 2:
-                this->theta1 = value;
-                break;
-            case nTimeIntervals + 3:
-                this->theta2 = value;
-                break;
-            default:
-                this->state.tree.times[ind] = value;
-                break;
+        if(ind == nTimeIntervals){
+            this->c = value;
+        }
+        else if(ind == nTimeIntervals + 1){
+            this->K = value;
+        }
+        else if(ind == nTimeIntervals + 2){
+            this->theta1 = value;
+        }
+        else if(nTimeIntervals + 3){
+            this->theta2 = value;
+        }
+        else {
+            this->state.tree.times[ind] = value;
         }
     }
 
     public:
     double GetParameter(int ind){
-        int nTimeIntervals = this->tree.CountTimeIntervals();
+        const int nTimeIntervals = this->state.tree.CountTimeIntervals();
         
-        switch(ind){
-            case nTimeIntervals:
-                return this->c;
-            case nTimeIntervals + 1:
-                return this->K;
-            case nTimeIntervals + 2:
-                return this->theta1;
-            case nTimeIntervals + 3:
-                return this->theta2;
-            default:
-                return this->state.tree.GetTime(ind);
+        if(ind == nTimeIntervals){
+            return this->c;
+        }
+        else if(ind == nTimeIntervals + 1){
+            return this->K;
+        }
+        else if(ind == nTimeIntervals + 2){
+            return this->theta1;
+        }
+        else if(nTimeIntervals + 3){
+            return this->theta2;
+        }
+        else {
+            return this->state.tree.GetTime(ind);
         }
     }
 
     double SimulateNextFlip(const int ind, const double tMax){
         SimState curState = this->state;
         double rho = 0, alpha;
-        double velocity, lambdaUpper;
+        double velocity = 0.0, lambdaUpper = 0.0;
 
-        nTimeIntervals = curState.tree.CountTimeIntervals();
+        int nTimeIntervals = curState.tree.CountTimeIntervals();
 
         // identify parameter
         // TODO: implement compute_x_upper() methods
-        switch(ind){
+        // TODO: Refactor in if-else fashion 
+        /* switch(ind){
             case nTimeIntervals:
                 velocity = state.c_velocity;
                 lambda_upper = state.compute_lambda_c_upper();
@@ -276,22 +269,21 @@ class ZigZagSimulation{
                 break;
             default:
                 velocity = state.time_velocities[ind];
-                lambdaUpper = state.compute_lambda_i_upper(ind);  
-        }
+                lambdaUpper = state.compute_lambda_i_upper(ind); */
 
         std::default_random_engine generator;
-        std::exponential_distribution<double> distribution(lambda_upper);
+        std::exponential_distribution<double> distribution(lambdaUpper);
 
-        std::mt19937 gen(1)
-        std::uniform_real_distribution<double> unif_dist(0, 1);
+        std::mt19937 gen(1);
+        std::uniform_real_distribution<double> unifDist(0, 1);
 
         while(true){
             rho += distribution(generator);
             if(rho < tMax){
-                alpha = ; // TODO: set new alpha
+                alpha = 0; // TODO: set new alpha accordingly
             } else alpha = 1;
 
-            if (unif_dist(gen) < alpha){
+            if (unifDist(gen) < alpha){
                 break;
             }
         }
@@ -300,10 +292,11 @@ class ZigZagSimulation{
     }
     
     
-    void run(const double tEnd, const double maxIncrement){
-        double t = 0, tau, nextToFlip, nextFlip, cur_value;
-        
-        this->InitializeState(); // TODO: Implement initialization
+    void run(const double tEnd, double maxIncrement){
+        double t = 0, tau, nextToFlip, nextFlip, cur_value, velocity;
+        Tree tree;
+        int nTimeIntervals;
+        // this->InitializeState(); // TODO: Implement initialization
         
         while(t < tEnd){
             tau = maxIncrement;
@@ -315,7 +308,7 @@ class ZigZagSimulation{
                     // TODO: Implement flip rule
                 }
             }
-            for(i = 0; i < nTimeIntervals + 4; i++){
+            for(int i = 0; i < nTimeIntervals + 4; i++){
                 nextFlip = this->SimulateNextFlip(i, maxIncrement);
                 if (nextFlip < maxIncrement){
                     maxIncrement = nextFlip;
@@ -323,7 +316,7 @@ class ZigZagSimulation{
                 }
             }
             t += maxIncrement;
-            for(i = 0; i < nTimeIntervals + 4; i++){
+            for(int i = 0; i < nTimeIntervals + 4; i++){
                 velocity = this->state.GetVelocity(i);
                 cur_value = this->GetParameter(i);
                 this->SetParameter(i, cur_value + velocity*maxIncrement);
