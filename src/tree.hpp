@@ -10,8 +10,8 @@ class Lineage{
     bool active;
     int n_mutations;
     std::vector<int> time_accesses;
-    Lineage* left_child;
-    Lineage* right_child;
+    Lineage* leftChild;
+    Lineage* rightChild;
     Lineage* parent;
 
     public:
@@ -20,7 +20,65 @@ class Lineage{
     }
 };
 
+class TreeIterator{
+    public:
+    using ValueType = Lineage;
+    using PointerType = ValueType*;
+    using ReferenceType = ValueType&;
+    
+    public:
+    TreeIterator(PointerType ptr)
+        : m_Ptr(ptr) {}
+
+    TreeIterator&  operator++(){
+        m_Ptr++;
+        return *this;
+    }
+
+    TreeIterator operator++(int){
+        TreeIterator iterator = *this;
+        ++(*this);
+        return iterator;
+    }
+
+    TreeIterator&  operator--(){
+        m_Ptr--;
+        return *this;
+    }
+
+    TreeIterator operator--(int){
+        TreeIterator iterator = *this;
+        --(*this);
+        return iterator;
+    }
+
+    PointerType operator->(){
+        return m_Ptr;
+    }
+
+    ReferenceType operator*(){
+        return *m_Ptr;
+    }
+
+    ReferenceType operator[](int index){
+        return *(m_Ptr + index);
+    }
+
+    bool operator==(const TreeIterator& other) const{
+        return m_Ptr == other.m_Ptr;
+    }
+
+    bool operator==(const TreeIterator& other) const{
+        return !(*this == other);
+    }
+
+    private:
+    PointerType m_Ptr;
+}
+
 class Tree{
+    public:
+        using Iterator = TreeIterator;
     public:
     std::vector<Lineage> v;
     std::vector<double> times;
@@ -108,5 +166,13 @@ class Tree{
             sumExp += (BinomialCoefficient(nAwake, 2) + c*nAwake + c*K*nDormient)*this->GetTime(i);
         }
         return exp(-sumExp)*pow(c, 2*this->CountDormancyPeriods())*pow(K, this->CountDormancyPeriods());
+    }
+
+    Iterator begin(){
+        return Iterator(&(this->v[0]))
+    }
+
+    Iterator end(){
+        return Iterator(&(this->v[0]) + this->v.size())
     }
 };
