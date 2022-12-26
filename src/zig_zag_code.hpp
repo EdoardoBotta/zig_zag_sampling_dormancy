@@ -116,7 +116,7 @@ class SimState{
                           const bool upperBound = false){
         
         Tree curTree = this->tree;
-        double brackets = 0, cOffset = 0, KOffset = 0;
+        double brackets = 0, cOffset = 0, KOffset = 0, tOffset = 0;
         double prod;
         int nDormancyPeriods;
 
@@ -127,7 +127,12 @@ class SimState{
 
         for(int i=0; i<curTree.CountTimeIntervals(); i++){
             auto [nAwake, nDormient] = curTree.CountLineagesUsing(i);
-            brackets += (nAwake + (K + KOffset)*nDormient)*curTree.GetTime(i);
+            
+            if(upperBound){
+                tOffset = this->PlusMinus(this->time_velocities[i]);
+            }
+
+            brackets += (nAwake + (K + KOffset)*nDormient)*(curTree.GetTime(i) + tOffset);
         }
         nDormancyPeriods = curTree.CountDormancyPeriods();
         prod = this->c_velocity*(brackets - 2*nDormancyPeriods/(c + cOffset));
@@ -139,7 +144,7 @@ class SimState{
                           const bool upperBound = false){
         
         Tree curTree = this->tree;
-        double weightedSum = 0, cOffset = 0.0, KOffset = 0.0;
+        double weightedSum = 0, cOffset = 0.0, KOffset = 0.0, tOffset = 0.0;
         double prod;
         int nDormancyPeriods;
 
@@ -150,7 +155,12 @@ class SimState{
 
         for(int i=0; i<curTree.CountTimeIntervals(); i++){
             auto [nAwake, nDormient] = curTree.CountLineagesUsing(i);
-            weightedSum += nDormient*curTree.GetTime(i);
+
+            if(upperBound){
+                tOffset = this->PlusMinus(this->time_velocities[i]);
+            }
+
+            weightedSum += nDormient*(curTree.GetTime(i) + tOffset);
         }
         nDormancyPeriods = curTree.CountDormancyPeriods();
         prod = this->K_velocity*((c + cOffset)*weightedSum - nDormancyPeriods/(K + KOffset));
@@ -228,7 +238,7 @@ class SimState{
 
         Tree curTree = this->tree;
         double sigma = 0, branchLength, theta, prod;
-        double branchVelocity = 0.0, branchOffset = 0.0, thetaOffset = 0.0;
+        double branchVelocity = 0.0, branchOffset = 0.0, thetaOffset = 0.0, cOffset, KOffset;
         int branchNumMutations;
         auto [nAwake, nDormient] = curTree.CountLineagesUsing(ind);
         float velocity = this->time_velocities[ind];
@@ -253,6 +263,8 @@ class SimState{
                     }
 
                     branchOffset = this->PlusMinus(branchVelocity);
+                    cOffset = this->PlusMinus(this->c_velocity);
+                    KOffset = this->PlusMinus(this->K_velocity);
                     
                     if (branch.isActive()){
                         thetaOffset = this->PlusMinus(this->theta1_velocity);
@@ -267,7 +279,10 @@ class SimState{
             }           
         }
 
-        prod = velocity*(sigma + BinomialCoefficient(nAwake, 2) + c*nAwake + c*K*nDormient);
+        prod = velocity*(sigma + BinomialCoefficient(nAwake, 2) 
+                            + (c + cOffset)*nAwake 
+                            + (c + cOffset)*(K + KOffset)*nDormient
+                        );
 
         return std::max(prod, 0.0);
     }

@@ -25,6 +25,10 @@ class Lineage{
         return this->leaf;
     }
 
+    bool isOverlapping(){
+        return (this->time_accesses.size() != 1);
+    }
+
     bool isUsingTime(const int ind){
         for(int i : this->time_accesses){
             if(i == ind){
