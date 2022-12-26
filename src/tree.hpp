@@ -107,10 +107,10 @@ class Tree{
     std::vector<double> times;
     
     public:
-    Tree(std::vector<Lineage> branches, std::vector<double> time_ints){
-        v = branches;
-        times = time_ints;
-    }
+    Tree(std::vector<Lineage> branches, std::vector<double> time_ints) 
+        : v(branches)
+        , times(time_ints)
+        {}
 
     public:
     Lineage GetBranch(int ind){
@@ -187,17 +187,17 @@ class Tree{
     }
 
     public:
-    Tree* ProgressTreeTimes(std::vector <double> time_velocities, 
+    Tree ProgressTreeTimes(std::vector <double> time_velocities, 
                             const double time){
         
-        if time_velocities.size != this->times.size(){
+        if (time_velocities.size() != this->times.size()){
             throw std::invalid_argument("sizes do not match");
         }                        
 
         std::vector<double> new_times = this->times;
 
         for(int i=0; i < time_velocities.size(); i++){
-            new_times[i] += time_velocities[i]*time
+            new_times[i] += time_velocities[i]*time;
         }
 
         return Tree(this->v, new_times);

@@ -20,16 +20,18 @@ class SimState{
     double maxIncrement, timeLocalization;
 
     SimState(Tree t, std::vector<double> tv, double theta1v, double theta2v,
-             double cv, double Kv, double maxI){
-        tree = t;
-        time_velocities = tv;
-        theta1_velocity = theta1v;
-        theta2_velocity = theta2v;
-        c_velocity = cv;
-        K_velocity = Kv;
-        maxIncrement = maxI;
-        timeLocalization = this->UpdateTimeLocalization();
-    }
+             double cv, double Kv, double maxI) 
+        : tree(t)
+        , time_velocities(tv)
+        , theta1_velocity(theta1v)
+        , theta2_velocity(theta2v)
+        , c_velocity(cv)
+        , K_velocity(Kv)
+        , maxIncrement(maxI)
+        {
+            this->UpdateTimeLocalization();
+        }
+    
 
     void UpdateTimeLocalization(){
         // TODO: Implement time localization computation
@@ -137,7 +139,7 @@ class SimState{
                           const bool upperBound = false){
         
         Tree curTree = this->tree;
-        double weightedSum = 0, branchOffset = 0.0, thetaOffset = 0.0;
+        double weightedSum = 0, cOffset = 0.0, KOffset = 0.0;
         double prod;
         int nDormancyPeriods;
 
@@ -148,11 +150,9 @@ class SimState{
 
         for(int i=0; i<curTree.CountTimeIntervals(); i++){
             auto [nAwake, nDormient] = curTree.CountLineagesUsing(i);
-            cout << nDormient << "\n";
             weightedSum += nDormient*curTree.GetTime(i);
         }
         nDormancyPeriods = curTree.CountDormancyPeriods();
-        cout << weightedSum;
         prod = this->K_velocity*((c + cOffset)*weightedSum - nDormancyPeriods/(K + KOffset));
 
         return std::max(prod, 0.0);
@@ -163,18 +163,17 @@ class SimState{
         // ind is expected to be 1 for theta_1 and 2 for theta_2
         
         Tree curTree = this->tree;
-        double velocity, branchLength, branchVelocity, sigma;
-        double branchOffset = 0, thetaOffset = 0;
+        double velocity, branchLength, branchVelocity;
+        double branchOffset = 0, thetaOffset = 0, sigma = 0;
         bool linFilter;
-        std::vector<int> TimeIntervalsUsed;
+        std::vector<int> timeIntervalsUsed;
 
         if (ind == 1){
             velocity = this->theta1_velocity;
         }
-        else velocity = this->theta1_velocity;
+        else velocity = this->theta2_velocity;
 
         for(Lineage branch : curTree){
-            
             switch(ind){
                 
                 case 1: 
@@ -228,7 +227,7 @@ class SimState{
                           const bool upperBound = false){
 
         Tree curTree = this->tree;
-        double sigma, branchLength, theta, prod;
+        double sigma = 0, branchLength, theta, prod;
         double branchVelocity = 0.0, branchOffset = 0.0, thetaOffset = 0.0;
         int branchNumMutations;
         auto [nAwake, nDormient] = curTree.CountLineagesUsing(ind);
@@ -321,19 +320,18 @@ class ZigZagSimulation{
 
     SimState ProgressTree(const double time){
         SimState curState = this->state;
-        Tree newTree = &(curState.tree.ProgressTreeTimes(curState.time_velocities, time));
+        Tree newTree = curState.tree.ProgressTreeTimes(curState.time_velocities, time);
 
         return SimState(newTree, curState.time_velocities,
                         curState.theta1_velocity, curState.theta2_velocity,
-                        curState.c_velocity, curState.K_velocity, curState.maxIncrement)
+                        curState.c_velocity, curState.K_velocity, curState.maxIncrement);
     }
 
     double SimulateNextFlip(const int ind, const double tMax){
         
-        SimState curState = this->state, progressedState;
-        Tree progressedTree;
+        SimState curState = this->state;
         double rho = 0, alpha, progressedLambda;
-        double velocity = this->state.GetVelocity(ind)
+        double velocity = this->state.GetVelocity(ind);
         double lambdaUpper = this->state.ComputeLambda(this->theta1, this->theta2, this->c, 
                                                        this->K, ind, true);
 
@@ -348,7 +346,7 @@ class ZigZagSimulation{
         while(true){
             rho += distribution(generator);
             if(rho < tMax){
-                progressedState = this->ProgressTree(rho);
+                SimState progressedState = this->ProgressTree(rho);
                 progressedLambda = progressedState.ComputeLambda(theta1 + curState.theta1_velocity*rho,
                                                                  theta2 + curState.K_velocity*rho,
                                                                  c + curState.c_velocity*rho,
@@ -368,8 +366,8 @@ class ZigZagSimulation{
     
     void run(const double tEnd, double maxIncrement){
         double t = 0, tau, nextToFlip, nextFlip, cur_value, velocity;
-        Tree tree;
         int nTimeIntervals;
+        Tree tree({Lineage()}, {0.1});
         // this->InitializeState(); // TODO: Implement initialization
         
         while(t < tEnd){
@@ -384,17 +382,17 @@ class ZigZagSimulation{
             }
 
             for(int i = 0; i < nTimeIntervals + 4; i++){
-                nextFlip = this->SimulateNextFlip(i, maxIncrement);
-                if (nextFlip < maxIncrement){
-                    maxIncrement = nextFlip;
+                nextFlip = this->SimulateNextFlip(i, tau);
+                if (nextFlip < tau){
+                    tau = nextFlip;
                     nextToFlip = i;
                 }
             }
-            t += maxIncrement;
+            t += tau;
             for(int i = 0; i < nTimeIntervals + 4; i++){
                 velocity = this->state.GetVelocity(i);
                 cur_value = this->GetParameter(i);
-                this->SetParameter(i, cur_value + velocity*maxIncrement);
+                this->SetParameter(i, cur_value + velocity*tau);
             }
             if (nextToFlip != 0){
                 this->state.FlipVelocity(nextToFlip);
