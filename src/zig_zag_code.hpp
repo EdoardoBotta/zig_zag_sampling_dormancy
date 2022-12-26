@@ -19,6 +19,18 @@ class SimState{
     double theta1_velocity, theta2_velocity, c_velocity, K_velocity;
     double maxIncrement, timeLocalization;
 
+    SimState(Tree t, std::vector<double> tv, double theta1v, double theta2v,
+             double cv, double Kv, double maxI){
+        tree = t;
+        time_velocities = tv;
+        theta1_velocity = theta1v;
+        theta2_velocity = theta2v;
+        c_velocity = cv;
+        K_velocity = Kv;
+        maxIncrement = maxI;
+        timeLocalization = this->UpdateTimeLocalization();
+    }
+
     void UpdateTimeLocalization(){
         // TODO: Implement time localization computation
     }
@@ -307,10 +319,20 @@ class ZigZagSimulation{
         }
     }
 
+    SimState ProgressTree(const double time){
+        SimState curState = this->state;
+        Tree newTree = &(curState.tree.ProgressTreeTimes(curState.time_velocities, time));
+
+        return SimState(newTree, curState.time_velocities,
+                        curState.theta1_velocity, curState.theta2_velocity,
+                        curState.c_velocity, curState.K_velocity, curState.maxIncrement)
+    }
+
     double SimulateNextFlip(const int ind, const double tMax){
         
-        SimState curState = this->state;
-        double rho = 0, alpha;
+        SimState curState = this->state, progressedState;
+        Tree progressedTree;
+        double rho = 0, alpha, progressedLambda;
         double velocity = this->state.GetVelocity(ind)
         double lambdaUpper = this->state.ComputeLambda(this->theta1, this->theta2, this->c, 
                                                        this->K, ind, true);
@@ -326,7 +348,13 @@ class ZigZagSimulation{
         while(true){
             rho += distribution(generator);
             if(rho < tMax){
-                alpha = 0; // TODO: set new alpha accordingly
+                progressedState = this->ProgressTree(rho);
+                progressedLambda = progressedState.ComputeLambda(theta1 + curState.theta1_velocity*rho,
+                                                                 theta2 + curState.K_velocity*rho,
+                                                                 c + curState.c_velocity*rho,
+                                                                 K + curState.K_velocity*rho,
+                                                                 ind, false); 
+                alpha = progressedLambda/lambdaUpper; 
             } else alpha = 1;
 
             if (unifDist(gen) < alpha){
@@ -354,6 +382,7 @@ class ZigZagSimulation{
                     // TODO: Implement flip rule
                 }
             }
+
             for(int i = 0; i < nTimeIntervals + 4; i++){
                 nextFlip = this->SimulateNextFlip(i, maxIncrement);
                 if (nextFlip < maxIncrement){
