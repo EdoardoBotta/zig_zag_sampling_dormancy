@@ -11,11 +11,15 @@ Tree CreateSampleTree(){
     lin_1.nMutations = 0;
     lin_1.time_accesses = {0};
     lin_1.leaf = true;
+    lin_1.leftChild = NULL;
+    lin_1.rightChild = NULL;
 
     lin_2.active = true;
     lin_2.nMutations = 0;
     lin_2.time_accesses = {0};
     lin_2.leaf = true;
+    lin_2.leftChild = NULL;
+    lin_2.rightChild = NULL;
 
     lin_3.active = true;
     lin_3.nMutations = 0;
@@ -52,6 +56,8 @@ Tree CreateSampleTree(){
     lin_7.nMutations = 0;
     lin_7.time_accesses = {0,1,2,3};
     lin_7.leaf = true;
+    lin_7.leftChild = NULL;
+    lin_7.rightChild = NULL;
 
     lin_8.active = true;
     lin_8.nMutations = 0;
@@ -59,6 +65,8 @@ Tree CreateSampleTree(){
     lin_8.leftChild = &lin_7;
     lin_8.rightChild = &lin_6;
     lin_8.leaf = true;
+    lin_8.leftChild = NULL;
+    lin_8.rightChild = NULL;
 
     lin_7.parent = &lin_8;
     lin_6.parent = &lin_8;

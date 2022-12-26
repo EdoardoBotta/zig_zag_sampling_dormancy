@@ -6,6 +6,7 @@
 #include "tree.hpp"
 using namespace std;
 
+
 /*
 int sample_branch(Tree tree){
     sample branch from tree.v
