@@ -12,6 +12,7 @@ class Lineage{
     bool active;
     bool leaf;
     int nMutations;
+    int mergerTime; // TODO: Implement constructor with automatic mergerTime computation.
     std::vector<int> time_accesses;
     Lineage* leftChild;
     Lineage* rightChild;
@@ -41,6 +42,23 @@ class Lineage{
 
     int GetNumMutations(){
         return this->nMutations;
+    }
+
+    int GetMergerTime(){
+        return *std::max_element(branch.time_accesses.begin(), branch.time_accesses.end());
+    }
+
+    void DecreaseMergerTime(){
+        std::vector<int>::iterator position = std::find(this->time_accesses.begin(), this->time_accesses.end(), this->mergerTime);
+        if (position != this->time_accesses.end()){
+            this->time_accesses.erase(position);
+            this->mergerTime -= 1;
+        }
+    }
+
+    void IncreaseMergerTime(){
+        this->time_accesses.push_back(this->mergerTime+1);
+        this->mergerTime += 1;
     }
 
     std::vector<int> GetTimeIntervalsUsed(){
@@ -126,12 +144,7 @@ class Tree{
         unordered_map<int, std::vector<Lineage>> endMap;
         
         for(Lineage branch : branches){
-            maxValue = -1;
-            for(int i : branch.time_accesses){
-                if(i > maxValue){
-                    maxValue = i;
-                }
-            }
+            maxValue = branch->GetMergerTime();
             if (endMap.find(maxValue) == endMap.end()){
                 endMap[maxValue] = {branch};
             }
@@ -233,23 +246,55 @@ class Tree{
     }
 
     public:
-    Tree PushDown(const int ind){
+    bool IsSwapValid(const int ind){
+        if(ind <= 0 || ind >= this->CountTimeIntervals()-1){
+            return false;
+        }
+        std::vector<Lineage>& mergingAtIndex = this->endTimes[ind];
+        for (branch : mergingAtIndex){
+            if (branch.leftChild.GetMergerTime() == ind - 1){
+                return false;
+            }
+            if (branch.rightChild.GetMergerTime() == ind - 1){
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public:
+    void SwapDown(const int ind){
         if(ind == 0 || ind == this->CountTimeIntervals()){
             throw std::invalid_argument("Invalid index for pushdown");
         }
-        std::vector<Lineage>& endingAtIndex = this->endTimes[ind];
+        std::vector<Lineage>& mergingAtIndex = this->endTimes[ind];
+        std::vector<Lineage>& mergingAtPreviousIndex = this->endTimes[ind-1];
+        
+        for (Lineage branch: mergingAtIndex){
+            branch.DecreaseMergerTime();
+        }
+        Lineage parent = mergingAtIndex[0].parent
+        parent.IncreaseMergerTime();
+
+        for (Lineage branch: mergingAtPreviousIndex){
+            branch.IncreaseMergerTime();
+        }
+        Lineage parent = mergingAtIndex[0].parent
+        parent.DecreaseMergerTime();
+
+        this->endTimes[ind] = mergingAtPreviousIndex;
+        this->endTimes[ind-1] = mergingAtIndex;
         /* 
-        find branches ending at ind-1.
-        If any of these is child of endingAtIndex:
-            for branch in endingAtIndex:
+        find branches merging at ind-1.
+        If any of these is child of mergingAtIndex:
+            for branch in mergingAtIndex:
                 drop 3 from time_accesses
                 add 3 to time_accesses of its parent
-            for branch in endingAtIndex(-1):
+            for branch in mergingAtIndex(-1):
                 add 3 to time_accesses
                 drop 3 from time_accesses of its parent
             update hash map accordingly
         */
-
     }
 
     Iterator begin(){

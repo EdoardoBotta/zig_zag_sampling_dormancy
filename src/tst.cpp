@@ -1,4 +1,4 @@
-#include "zig_zag_code.hpp"
+#include "simulation.hpp"
 #include <vector>
 #include <assert.h>
 #include <math.h>

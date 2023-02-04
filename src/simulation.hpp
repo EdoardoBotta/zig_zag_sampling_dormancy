@@ -388,7 +388,7 @@ class ZigZagSimulation{
         
         while(t < tEnd){
             tau = maxIncrement;
-            nextToFlip = 0;
+            nextToFlip = -1;
             tree = this->state.tree;
             nTimeIntervals = tree.CountTimeIntervals();
             for(int i = 0; i < nTimeIntervals + 4; i++){
@@ -410,12 +410,17 @@ class ZigZagSimulation{
                 cur_value = this->GetParameter(i);
                 this->SetParameter(i, cur_value + velocity*tau);
             }
-            if (nextToFlip != 0){
+            if (nextToFlip != -1){
                 this->state.FlipVelocity(nextToFlip);
             }
 
-            /* TODO: Implement boundary conditions
-               TODO: Implement MH step */
+            if(nextToFlip > 0 && nextToFlip < nTimeIntervals - 1){
+                if(tree.IsSwapValid(nextToFlip)){
+                    tree.SwapDown(nextToFlip)
+                }
+            }
+
+            /* TODO: Implement MH step */
         }
     } 
          
