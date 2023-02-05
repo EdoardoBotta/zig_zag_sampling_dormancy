@@ -21,7 +21,7 @@ class SimState{
     double maxIncrement, timeLocalization;
 
     SimState(Tree t, std::vector<double> tv, double theta1v, double theta2v,
-             double cv, double Kv, double maxI) 
+             double cv, double Kv, double maxI, double timeLocalization) 
         : tree(t)
         , time_velocities(tv)
         , theta1_velocity(theta1v)
@@ -29,13 +29,11 @@ class SimState{
         , c_velocity(cv)
         , K_velocity(Kv)
         , maxIncrement(maxI)
-        {
-            this->UpdateTimeLocalization();
-        }
+        , timeLocalization(timeLocalization)
+        {}
     
-
-    void UpdateTimeLocalization(){
-        // TODO: Implement time localization computation
+    void SetTimeLocalization(double timeLoc){
+        this->timeLocalization = timeLoc;
     }
 
     double PlusMinus(const double velocity){
@@ -334,6 +332,40 @@ class ZigZagSimulation{
         }
     }
 
+    double ComputeTimeLocalization(){
+        int nTimeIntervals = this->state.tree.CountTimeIntervals();
+        double minLoc = 100000000000;
+        double curLoc;
+        double velocity;
+        int boundaryFactor;
+        SimState curState = this->state;
+
+        for(int i = 0; i < nTimeIntervals + 4; i++){
+            boundaryFactor = 0;
+
+            if(curState.tree.GetMutationsShorterChildAt(i) > 0){
+                
+                if(!curState.tree.IsSwapValid(i)){
+                    boundayFactor += 1;
+                }
+                
+                if(i == 0 || i >= nTimeIntervals){
+                    boundaryFactor += 1;
+                }
+            }
+
+            velocity = curState.GetVelocity(i);
+            if (velocity < 0){
+                curLoc = this->GetParameter(i) / ((1 + 4*boundaryFactor)*velocity);
+                if(curLoc < minLoc){
+                    minLoc = curLoc;
+                }
+            }
+
+            return std::min(minLoc, curState.maxIncrement);
+        }
+    }
+
     SimState ProgressTree(const double time){
         SimState curState = this->state;
         Tree newTree = curState.tree.ProgressTreeTimes(curState.time_velocities, time);
@@ -382,7 +414,8 @@ class ZigZagSimulation{
     
     void run(const double tEnd, double maxIncrement){
         double t = 0, tau, nextToFlip, nextFlip, cur_value, velocity;
-        int nTimeIntervals;
+        int c, J;
+        int nTimeIntervals, timeLoc;
         Tree tree({Lineage()}, {0.1});
         // this->InitializeState(); // TODO: Implement initialization
         
@@ -392,12 +425,24 @@ class ZigZagSimulation{
             tree = this->state.tree;
             nTimeIntervals = tree.CountTimeIntervals();
             for(int i = 0; i < nTimeIntervals + 4; i++){
-                if (this->state.GetVelocity(i) < 0){
-                    // TODO: Implement flip rule
+                velocity = this->state.GetVelocity(i);
+                if (velocity < 0){
+                    d = 1;
+                    J = i;
+                    if((i == 0 || i >= nTimeIntervals || this->state.tree.IsSwapValid(i)) && this->state.tree.GetMutationsShorterChildAt(i) > 0){
+                        d = 1 + 4; // c = 4
+                        J = 0;
+                    }
+                    if(-this->GetParameter(i)/(d*velocity) < tau){
+                        tau = -this->GetParameter(i)/(d*velocity);
+                        I = J;
+                    }
                 }
             }
 
             for(int i = 0; i < nTimeIntervals + 4; i++){
+                timeLoc = this->ComputeTimeLocalization();
+                this->state.SetTimeLocalization(timeLoc);
                 nextFlip = this->SimulateNextFlip(i, tau);
                 if (nextFlip < tau){
                     tau = nextFlip;

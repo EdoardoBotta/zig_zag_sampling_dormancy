@@ -160,6 +160,18 @@ class Tree{
     }
 
     public:
+    Lineage GetBranchLength(Lineage branch){
+        int length;
+        std::vector<int> time_accesses = branch.GetTimeIntervalsUsed();
+
+        for(int i : time_accesses){
+            length += this->times[i];
+        }
+
+        return length;
+    }
+
+    public:
     int CountTimeIntervals(){
         return this->times.size();
     }
@@ -172,6 +184,36 @@ class Tree{
     public:
     int CountBranches(){
         return this->v.size();
+    }
+
+    public:
+    int CountMutations(){
+        int mutationCount = 0;
+        for (Lineage branch : this->v){
+            mutationCount += branch.GetNumMutations();
+        }
+        return mutationCount;
+    }
+
+    public:
+    int GetMutationsShorterChildAt(int timeIdx){
+        // should sum branch mutations if timeIdx == 0
+        int minLength, branchLength
+        Lineage shortestBranch;
+        
+        if(timeIdx > this->CountTimeIntervals()-1){
+            return this->CountMutations();
+        }
+        
+        mergingAtIdx = this->endTimes[timeIdx];
+        for (Lineage branch : mergingAtIdx){
+            branchLength = this->GetBranchLength(branch);
+            if(branchLength < minLength){
+                shortestBranch = branch;
+                minLength = branchLength;
+            }
+        }
+        return shortestBranch.GetNumMutations();
     }
 
     public:
@@ -239,7 +281,7 @@ class Tree{
         std::vector<double> new_times = this->times;
 
         for(int i=0; i < time_velocities.size(); i++){
-            new_times[i] += time_velocities[i]*time;
+            new_times[i] = std::max(this->times[i] + time_velocities[i]*time, 0);
         }
 
         return Tree(this->v, new_times);
@@ -252,10 +294,10 @@ class Tree{
         }
         std::vector<Lineage>& mergingAtIndex = this->endTimes[ind];
         for (branch : mergingAtIndex){
-            if (branch.leftChild.GetMergerTime() == ind - 1){
+            if (branch.leftChild.isActive() && branch.leftChild.GetMergerTime() == ind - 1){
                 return false;
             }
-            if (branch.rightChild.GetMergerTime() == ind - 1){
+            if (branch.rightChild.isActive() && branch.rightChild.GetMergerTime() == ind - 1){
                 return false;
             }
         }
