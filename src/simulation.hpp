@@ -461,7 +461,7 @@ class ZigZagSimulation{
 
             if(nextToFlip > 0 && nextToFlip < nTimeIntervals - 1){
                 if(tree.IsSwapValid(nextToFlip)){
-                    tree.SwapDown(nextToFlip)
+                    tree.SwapDown(nextToFlip);
                 }
             }
 
