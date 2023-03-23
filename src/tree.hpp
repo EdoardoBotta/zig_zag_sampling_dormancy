@@ -4,8 +4,15 @@
 #include <cmath>
 #include <random>
 #include <unordered_map>
+#include <algorithm>
 #include "utils.hpp"
 using namespace std;
+
+struct lineageCounts {
+    int nAwake, nDormient
+};
+
+typedef struct lineageCounts LineageCountResult;
 
 class Lineage{
     public:
@@ -17,6 +24,7 @@ class Lineage{
     Lineage* leftChild;
     Lineage* rightChild;
     Lineage* parent;
+
 
     public:
     bool isActive(){
@@ -45,7 +53,7 @@ class Lineage{
     }
 
     int GetMergerTime(){
-        return *std::max_element(branch.time_accesses.begin(), branch.time_accesses.end());
+        return *std::max_element(this->time_accesses.begin(), this->time_accesses.end());
     }
 
     void DecreaseMergerTime(){
@@ -144,7 +152,7 @@ class Tree{
         unordered_map<int, std::vector<Lineage>> endMap;
         
         for(Lineage branch : branches){
-            maxValue = branch->GetMergerTime();
+            maxValue = branch.GetMergerTime();
             if (endMap.find(maxValue) == endMap.end()){
                 endMap[maxValue] = {branch};
             }
@@ -160,8 +168,8 @@ class Tree{
     }
 
     public:
-    Lineage GetBranchLength(Lineage branch){
-        int length;
+    double GetBranchLength(Lineage branch){
+        double length;
         std::vector<int> time_accesses = branch.GetTimeIntervalsUsed();
 
         for(int i : time_accesses){
@@ -198,8 +206,10 @@ class Tree{
     public:
     int GetMutationsShorterChildAt(int timeIdx){
         // should sum branch mutations if timeIdx == 0
-        int minLength, branchLength
+        double minLength, branchLength;
         Lineage shortestBranch;
+        std::vector<Lineage> mergingAtIdx;
+        
         
         if(timeIdx > this->CountTimeIntervals()-1){
             return this->CountMutations();
@@ -227,19 +237,10 @@ class Tree{
         }
         return nDormancyPeriods;
     }
-    
-    public:
-    float GetBranchLength(Lineage branch){
-        double length = 0;
-        std::vector<int> timeContribs = branch.time_accesses;
-        for(int i=0; i < timeContribs.size(); i++){
-            length += this->times[timeContribs[i]];
-        }
-        return length;
-    }
 
     public:
-    std::tuple<int,int> CountLineagesUsing(int ind){
+    LineageCountResult CountLineagesUsing(int ind){
+        LineageCountResult result;
         int nAwake = 0;
         int nDormient = 0;
         int m = 0;
@@ -252,18 +253,26 @@ class Tree{
                 else nDormient++;
             }
         }
+        
+        result.nAwake = nAwake;
+        result.nDormient = nDormient;
 
-        return {nAwake, nDormient};
+        return result;
     }
 
 
     public:
     float ComputeLikelihood(int c, int K){
+        LineageCountResult countResult;
         int nAwake, nDormient, m;
         double sumExp = 0;
     
         for (int i=0; i < this->CountTimeIntervals(); i++){
-            auto [nAwake, nDormient] = this->CountLineagesUsing(i);
+            countResult = this->CountLineagesUsing(i);
+            
+            nAwake = countResult.nAwake;
+            nDormient = countResult.nDormient;
+            
             sumExp += (BinomialCoefficient(nAwake, 2) + c*nAwake + c*K*nDormient)*this->GetTime(i);
         }
         
@@ -274,6 +283,8 @@ class Tree{
     Tree ProgressTreeTimes(std::vector <double> time_velocities, 
                             const double time){
         
+        int progressedTime;
+
         if (time_velocities.size() != this->times.size()){
             throw std::invalid_argument("sizes do not match");
         }                        
@@ -281,7 +292,8 @@ class Tree{
         std::vector<double> new_times = this->times;
 
         for(int i=0; i < time_velocities.size(); i++){
-            new_times[i] = std::max(this->times[i] + time_velocities[i]*time, 0);
+            progressedTime = this->times[i] + time_velocities[i]*time;
+            new_times[i] = std::max(progressedTime, 0);
         }
 
         return Tree(this->v, new_times);
@@ -293,11 +305,11 @@ class Tree{
             return false;
         }
         std::vector<Lineage>& mergingAtIndex = this->endTimes[ind];
-        for (branch : mergingAtIndex){
-            if (branch.leftChild.isActive() && branch.leftChild.GetMergerTime() == ind - 1){
+        for (Lineage branch : mergingAtIndex){
+            if (branch.leftChild->isActive() && branch.leftChild->GetMergerTime() == ind - 1){
                 return false;
             }
-            if (branch.rightChild.isActive() && branch.rightChild.GetMergerTime() == ind - 1){
+            if (branch.rightChild->isActive() && branch.rightChild->GetMergerTime() == ind - 1){
                 return false;
             }
         }
@@ -315,13 +327,13 @@ class Tree{
         for (Lineage branch: mergingAtIndex){
             branch.DecreaseMergerTime();
         }
-        Lineage parent = mergingAtIndex[0].parent
+        Lineage parent = mergingAtIndex[0].parent;
         parent.IncreaseMergerTime();
 
         for (Lineage branch: mergingAtPreviousIndex){
             branch.IncreaseMergerTime();
         }
-        Lineage parent = mergingAtIndex[0].parent
+        parent = mergingAtIndex[0].parent
         parent.DecreaseMergerTime();
 
         this->endTimes[ind] = mergingAtPreviousIndex;

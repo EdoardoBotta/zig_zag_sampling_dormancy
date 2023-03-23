@@ -14,3 +14,17 @@ int BinomialCoefficient(const int n, const int k) {
 
   return aSolutions[k - 1];
 }
+
+int GenerateRandomUniform(int rangeStart, int rangeEnd){
+    std::random_device                  rand_dev;
+    std::mt19937                        generator(rand_dev());
+    std::uniform_int_distribution<int>    distr(rangeStart, rangeEnd);
+    return distr(generator);
+}
+
+int GenerateRandomRealUniform(int rangeStart, int rangeEnd){
+    std::random_device                  rand_dev;
+    std::mt19937                        generator(rand_dev());
+    std::uniform_real_distribution<int>    distr(rangeStart, rangeEnd);
+    return distr(generator);
+}

@@ -114,6 +114,7 @@ class SimState{
                           const double K,
                           const bool upperBound = false){
         
+        LineageCountResult countResult;
         Tree curTree = this->tree;
         double brackets = 0, cOffset = 0, KOffset = 0, tOffset = 0;
         double prod;
@@ -125,8 +126,10 @@ class SimState{
         }
 
         for(int i=0; i<curTree.CountTimeIntervals(); i++){
-            auto [nAwake, nDormient] = curTree.CountLineagesUsing(i);
-            
+            countResult = curTree.CountLineagesUsing(i);
+            nAwake = countResult.nAwake;
+            nDormient = countResult.nDormient;
+
             if(upperBound){
                 tOffset = this->PlusMinus(this->time_velocities[i]);
             }
@@ -142,6 +145,7 @@ class SimState{
     double ComputeLambdaK(const double c, const double K,
                           const bool upperBound = false){
         
+        LineageCountResult countResult;
         Tree curTree = this->tree;
         double weightedSum = 0, cOffset = 0.0, KOffset = 0.0, tOffset = 0.0;
         double prod;
@@ -153,7 +157,9 @@ class SimState{
         }
 
         for(int i=0; i<curTree.CountTimeIntervals(); i++){
-            auto [nAwake, nDormient] = curTree.CountLineagesUsing(i);
+            countResult = curTree.CountLineagesUsing(i);
+            nAwake = countResult.nAwake;
+            nDormient = countResult.nDormient;
 
             if(upperBound){
                 tOffset = this->PlusMinus(this->time_velocities[i]);
@@ -332,9 +338,48 @@ class ZigZagSimulation{
         }
     }
 
+    private: Lineage SampleMHCandidateBranch(){
+        int nCandidates = 0;
+        int cumSum = 0;
+        double randUnif;
+        
+        for (Lineage branch: this->state.tree){
+            if (branch.isActive() || !branch.isOverlapping()){
+                nCandidates += branch.GetTimeIntervalsUsed().size();
+            }
+        
+        randUnif = GenerateRandomUniform(0, nCandidates);
+        for (Lineage branch: this->state.tree){
+            if (branch.isActive() || !branch.isOverlapping()){
+                if (randUnif < cumSum + branch.GetTimeIntervalsUsed().size()){
+                    return branch
+                }
+                cumSum += branch.GetTimeIntervalsUsed().size();
+            }
+        }    
+    }
+
+    private: void MHStep(){
+        Lineage targetBranch;
+        double accRate;
+        double randUnif = GenerateRandomRealUniform();
+
+        targetBranch = SampleMHCandidateBranch(); 
+
+        move = BuildMHMove(targetBranch); // to be implemented
+
+        accRate = ComputeAccRate(move); // to be implemented
+
+        if (randUnif < accRate){
+            return move.newTree()
+        }
+        return move.oldTree()
+    }
+
+    public:
     double ComputeTimeLocalization(){
         int nTimeIntervals = this->state.tree.CountTimeIntervals();
-        double minLoc = 100000000000;
+        double minLoc = -1;
         double curLoc;
         double velocity;
         int boundaryFactor;
@@ -346,7 +391,7 @@ class ZigZagSimulation{
             if(curState.tree.GetMutationsShorterChildAt(i) > 0){
                 
                 if(!curState.tree.IsSwapValid(i)){
-                    boundayFactor += 1;
+                    boundaryFactor += 1;
                 }
                 
                 if(i == 0 || i >= nTimeIntervals){
@@ -357,7 +402,7 @@ class ZigZagSimulation{
             velocity = curState.GetVelocity(i);
             if (velocity < 0){
                 curLoc = this->GetParameter(i) / ((1 + 4*boundaryFactor)*velocity);
-                if(curLoc < minLoc){
+                if(curLoc < minLoc || minLoc == -1){
                     minLoc = curLoc;
                 }
             }
@@ -414,7 +459,7 @@ class ZigZagSimulation{
     
     void run(const double tEnd, double maxIncrement){
         double t = 0, tau, nextToFlip, nextFlip, cur_value, velocity;
-        int c, J;
+        int c, J, d, I;
         int nTimeIntervals, timeLoc;
         Tree tree({Lineage()}, {0.1});
         // this->InitializeState(); // TODO: Implement initialization
